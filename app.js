@@ -56,51 +56,54 @@ app.get("/", (req, res) => {
 
 app.post("/", upload.single("file-to-upload"), async (req, res) => {
   try {
-    let hotDogCount = 0;
     // Upload image to cloudinary
     const result = await cloudinary.uploader.upload(req.file.path);
-    const objectURL = result.secure_url;
+    const facesImageURL = result.secure_url;
 
-    // Analyze a URL image
-    console.log("Analyzing objects in image...", objectURL.split("/").pop());
+    async.series([
+      async function () {
+        /**
+                * DETECT FACES
+                * This example detects faces and returns its:
+                *     gender, age, location of face (bounding box), confidence score, and size of face.
+                */
+        console.log('-------------------------------------------------');
+        console.log('DETECT FACES');
+        console.log();
 
-    const objects = (
-      await computerVisionClient.analyzeImage(objectURL, {
-        visualFeatures: ["Objects"],
-      })
-    ).objects;
-    console.log();
+        // <snippet_faces>
+        // const facesImageURL = 'https://raw.githubusercontent.com/Azure-Samples/cognitive-services-sample-data-files/master/ComputerVision/Images/faces.jpg';
 
-    // Print objects bounding box and confidence
-    if (objects.length) {
-      console.log(
-        `${objects.length} object${objects.length == 1 ? "" : "s"} found:`
-      );
-      for (const obj of objects) {
-        if (obj.object === "Hot dog") {
-          hotDogCount = hotDogCount + 1;
+        // Analyze URL image.
+        console.log('Analyzing faces in image...', facesImageURL.split('/').pop());
+        // Get the visual feature for 'Faces' only.
+        const faces = (await computerVisionClient.analyzeImage(facesImageURL, { visualFeatures: ['Faces'] })).faces;
+
+        // Print the bounding box, gender, and age from the faces.
+        if (faces.length) {
+          console.log(`${faces.length} face${faces.length == 1 ? '' : 's'} found:`);
+          for (const face of faces) {
+            console.log(`    Gender: ${face.gender}`.padEnd(20)
+              + ` Age: ${face.age}`.padEnd(10) + `at ${formatRectFaces(face.faceRectangle)}`);
+          }
+        } else { console.log('No faces found.'); }
+        // </snippet_faces>
+
+        // <snippet_formatfaces>
+        // Formats the bounding box
+        function formatRectFaces(rect) {
+          return `top=${rect.top}`.padEnd(10) + `left=${rect.left}`.padEnd(10) + `bottom=${rect.top + rect.height}`.padEnd(12)
+            + `right=${rect.left + rect.width}`.padEnd(10) + `(${rect.width}x${rect.height})`;
         }
-        console.log(
-          `    ${obj.object} (${obj.confidence.toFixed(
-            2
-          )}) at ${formatRectObjects(obj.rectangle)}`
-        );
+        // </snippet_formatfaces>
+
+        /**
+         * END - Detect Faces
+         */
+        res.render("result.ejs", { faces: faces, img: facesImageURL });
       }
-    } else {
-      console.log("No objects found.");
-    }
+    ])
 
-    function formatRectObjects(rect) {
-      return (
-        `top=${rect.y}`.padEnd(10) +
-        `left=${rect.x}`.padEnd(10) +
-        `bottom=${rect.y + rect.h}`.padEnd(12) +
-        `right=${rect.x + rect.w}`.padEnd(10) +
-        `(${rect.w}x${rect.h})`
-      );
-    }
-
-    res.render("result.ejs", { count: hotDogCount, img: objectURL });
   } catch (err) {
     console.log(err);
   }
