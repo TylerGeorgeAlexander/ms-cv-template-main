@@ -59,6 +59,7 @@ app.post("/", upload.single("file-to-upload"), async (req, res) => {
     // Upload image to cloudinary
     const result = await cloudinary.uploader.upload(req.file.path);
     const facesImageURL = result.secure_url;
+    const objectURL = result.secure_url;
 
     async.series([
       async function () {
@@ -100,7 +101,45 @@ app.post("/", upload.single("file-to-upload"), async (req, res) => {
         /**
          * END - Detect Faces
          */
-        res.render("result.ejs", { faces: faces, img: facesImageURL });
+
+        /**
+    /**
+         * DETECT OBJECTS
+         * Detects objects in URL image:
+         *     gives confidence score, shows location of object in image (bounding box), and object size. 
+         */
+        console.log('-------------------------------------------------');
+        console.log('DETECT OBJECTS');
+        console.log();
+
+        // <snippet_objects>
+        // Image of a dog
+        // const objectURL = 'https://raw.githubusercontent.com/Azure-Samples/cognitive-services-node-sdk-samples/master/Data/image.jpg';
+
+        // Analyze a URL image
+        console.log('Analyzing objects in image...', objectURL.split('/').pop());
+        const objects = (await computerVisionClient.analyzeImage(objectURL, { visualFeatures: ['Objects'] })).objects;
+        console.log();
+
+        // Print objects bounding box and confidence
+        if (objects.length) {
+          console.log(`${objects.length} object${objects.length == 1 ? '' : 's'} found:`);
+          for (const obj of objects) { console.log(`    ${obj.object} (${obj.confidence.toFixed(2)}) at ${formatRectObjects(obj.rectangle)}`); }
+        } else { console.log('No objects found.'); }
+        // </snippet_objects>
+
+        // <snippet_objectformat>
+        // Formats the bounding box
+        function formatRectObjects(rect) {
+          return `top=${rect.y}`.padEnd(10) + `left=${rect.x}`.padEnd(10) + `bottom=${rect.y + rect.h}`.padEnd(12)
+            + `right=${rect.x + rect.w}`.padEnd(10) + `(${rect.w}x${rect.h})`;
+        }
+        // </snippet_objectformat>
+        /**
+         * END - Detect Objects
+         */
+        // TODO: pass the person props to the view
+        res.render("result.ejs", { faces: faces, person: objects.person, img: facesImageURL });
       }
     ])
 
